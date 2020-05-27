@@ -477,6 +477,7 @@ func (coll *Collection) updateOrReplace(ctx context.Context, filter bsoncore.Doc
 	expectedRr returnResult, checkDollarKey bool, opts ...*options.UpdateOptions) (*UpdateResult, error) {
 
 	if ctx == nil {
+		fmt.Printf("RHEEM_MONGO ctx nil\n")
 		ctx = context.Background()
 	}
 
@@ -486,6 +487,7 @@ func (coll *Collection) updateOrReplace(ctx context.Context, filter bsoncore.Doc
 
 	u, err := transformUpdateValue(coll.registry, update, checkDollarKey)
 	if err != nil {
+		fmt.Printf("RHEEM_MONGO transformUpdateValue: %s\n", err.Error())
 		return nil, err
 	}
 	updateDoc = bsoncore.AppendValueElement(updateDoc, "u", u)
@@ -501,6 +503,7 @@ func (coll *Collection) updateOrReplace(ctx context.Context, filter bsoncore.Doc
 	if uo.ArrayFilters != nil {
 		arr, err := uo.ArrayFilters.ToArrayDocument()
 		if err != nil {
+			fmt.Printf("RHEEM_MONGO ToArrayDocument: %s\n", err.Error())
 			return nil, err
 		}
 		updateDoc = bsoncore.AppendArrayElement(updateDoc, "arrayFilters", arr)
@@ -515,6 +518,7 @@ func (coll *Collection) updateOrReplace(ctx context.Context, filter bsoncore.Doc
 		var err error
 		sess, err = session.NewClientSession(coll.client.sessionPool, coll.client.id, session.Implicit)
 		if err != nil {
+			fmt.Printf("RHEEM_MONGO NewClientSession: %s\n", err.Error())
 			return nil, err
 		}
 		defer sess.EndSession()
@@ -522,6 +526,7 @@ func (coll *Collection) updateOrReplace(ctx context.Context, filter bsoncore.Doc
 
 	err = coll.client.validSession(sess)
 	if err != nil {
+		fmt.Printf("RHEEM_MONGO validSession: %s\n", err.Error())
 		return nil, err
 	}
 
@@ -554,6 +559,7 @@ func (coll *Collection) updateOrReplace(ctx context.Context, filter bsoncore.Doc
 
 	rr, err := processWriteError(err)
 	if rr&expectedRr == 0 {
+		fmt.Printf("RHEEM_MONGO processWriteError: %s\n", err.Error())
 		return nil, err
 	}
 
@@ -594,6 +600,7 @@ func (coll *Collection) UpdateOne(ctx context.Context, filter interface{}, updat
 
 	f, err := transformBsoncoreDocument(coll.registry, filter)
 	if err != nil {
+		fmt.Printf("RHEEM_MONGO UpdateOne: %s\n", err.Error())
 		return nil, err
 	}
 
@@ -622,6 +629,7 @@ func (coll *Collection) UpdateMany(ctx context.Context, filter interface{}, upda
 
 	f, err := transformBsoncoreDocument(coll.registry, filter)
 	if err != nil {
+		fmt.Printf("RHEEM_MONGO UpdateMany: %s\n", err.Error())
 		return nil, err
 	}
 
