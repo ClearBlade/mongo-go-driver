@@ -475,105 +475,122 @@ func (coll *Collection) DeleteMany(ctx context.Context, filter interface{},
 
 func (coll *Collection) updateOrReplace(ctx context.Context, filter bsoncore.Document, update interface{}, multi bool,
 	expectedRr returnResult, checkDollarKey bool, opts ...*options.UpdateOptions) (*UpdateResult, error) {
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 1\n")
 	if ctx == nil {
-		fmt.Printf("RHEEM_MONGO ctx nil\n")
+		fmt.Printf("RHEEM_MONGO_ERR ctx nil\n")
 		ctx = context.Background()
 	}
 
 	uo := options.MergeUpdateOptions(opts...)
 	uidx, updateDoc := bsoncore.AppendDocumentStart(nil)
 	updateDoc = bsoncore.AppendDocumentElement(updateDoc, "q", filter)
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 2\n")
 	u, err := transformUpdateValue(coll.registry, update, checkDollarKey)
 	if err != nil {
-		fmt.Printf("RHEEM_MONGO transformUpdateValue: %s\n", err.Error())
+		fmt.Printf("RHEEM_MONGO_ERR transformUpdateValue: %s\n", err.Error())
 		return nil, err
 	}
+	fmt.Printf("RHEEM_MONGO updateOrReplace 3\n")
 	updateDoc = bsoncore.AppendValueElement(updateDoc, "u", u)
 	if multi {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 4\n")
 		updateDoc = bsoncore.AppendBooleanElement(updateDoc, "multi", multi)
 	}
 
 	// collation, arrayFilters, and upsert are included on the individual update documents rather than as part of the
 	// command
 	if uo.Collation != nil {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 5\n")
 		updateDoc = bsoncore.AppendDocumentElement(updateDoc, "collation", bsoncore.Document(uo.Collation.ToDocument()))
 	}
+	fmt.Printf("RHEEM_MONGO updateOrReplace 6\n")
 	if uo.ArrayFilters != nil {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 7\n")
 		arr, err := uo.ArrayFilters.ToArrayDocument()
 		if err != nil {
-			fmt.Printf("RHEEM_MONGO ToArrayDocument: %s\n", err.Error())
+			fmt.Printf("RHEEM_MONGO_ERR ToArrayDocument: %s\n", err.Error())
 			return nil, err
 		}
+		fmt.Printf("RHEEM_MONGO updateOrReplace 8\n")
 		updateDoc = bsoncore.AppendArrayElement(updateDoc, "arrayFilters", arr)
 	}
+	fmt.Printf("RHEEM_MONGO updateOrReplace 9\n")
 	if uo.Upsert != nil {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 10\n")
 		updateDoc = bsoncore.AppendBooleanElement(updateDoc, "upsert", *uo.Upsert)
 	}
+	fmt.Printf("RHEEM_MONGO updateOrReplace 11\n")
 	updateDoc, _ = bsoncore.AppendDocumentEnd(updateDoc, uidx)
 
 	sess := sessionFromContext(ctx)
 	if sess == nil && coll.client.sessionPool != nil {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 12\n")
 		var err error
 		sess, err = session.NewClientSession(coll.client.sessionPool, coll.client.id, session.Implicit)
 		if err != nil {
-			fmt.Printf("RHEEM_MONGO NewClientSession: %s\n", err.Error())
+			fmt.Printf("RHEEM_MONGO_ERR NewClientSession: %s\n", err.Error())
 			return nil, err
 		}
+		fmt.Printf("RHEEM_MONGO updateOrReplace 13\n")
 		defer sess.EndSession()
 	}
 
 	err = coll.client.validSession(sess)
 	if err != nil {
-		fmt.Printf("RHEEM_MONGO validSession: %s\n", err.Error())
+		fmt.Printf("RHEEM_MONGO_ERR validSession: %s\n", err.Error())
 		return nil, err
 	}
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 14\n")
 	wc := coll.writeConcern
 	if sess.TransactionRunning() {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 15\n")
 		wc = nil
 	}
 	if !writeconcern.AckWrite(wc) {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 16\n")
 		sess = nil
 	}
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 17\n")
 	selector := makePinnedSelector(sess, coll.writeSelector)
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 18\n")
 	op := operation.NewUpdate(updateDoc).
 		Session(sess).WriteConcern(wc).CommandMonitor(coll.client.monitor).
 		ServerSelector(selector).ClusterClock(coll.client.clock).
 		Database(coll.db.name).Collection(coll.name).
 		Deployment(coll.client.deployment).Crypt(coll.client.crypt)
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 19\n")
 	if uo.BypassDocumentValidation != nil && *uo.BypassDocumentValidation {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 20\n")
 		op = op.BypassDocumentValidation(*uo.BypassDocumentValidation)
 	}
 	retry := driver.RetryNone
 	// retryable writes are only enabled updateOne/replaceOne operations
 	if !multi && coll.client.retryWrites {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 21\n")
 		retry = driver.RetryOncePerCommand
 	}
 	op = op.Retry(retry)
 	err = op.Execute(ctx)
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 22\n")
 	rr, err := processWriteError(err)
 	if rr&expectedRr == 0 {
-		fmt.Printf("RHEEM_MONGO processWriteError: %s\n", err.Error())
+		fmt.Printf("RHEEM_MONGO_ERR processWriteError: %s\n", err.Error())
 		return nil, err
 	}
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 23\n")
 	opRes := op.Result()
 	res := &UpdateResult{
 		MatchedCount:  int64(opRes.N),
 		ModifiedCount: int64(opRes.NModified),
 		UpsertedCount: int64(len(opRes.Upserted)),
 	}
+	fmt.Printf("RHEEM_MONGO updateOrReplace 24\n")
 	if len(opRes.Upserted) > 0 {
+		fmt.Printf("RHEEM_MONGO updateOrReplace 25\n")
 		res.UpsertedID = opRes.Upserted[0].ID
 		res.MatchedCount--
 	}
-
+	fmt.Printf("RHEEM_MONGO updateOrReplace 26\n")
 	return res, err
 }
 
@@ -593,17 +610,18 @@ func (coll *Collection) updateOrReplace(ctx context.Context, filter bsoncore.Doc
 // For more information about the command, see https://docs.mongodb.com/manual/reference/command/update/.
 func (coll *Collection) UpdateOne(ctx context.Context, filter interface{}, update interface{},
 	opts ...*options.UpdateOptions) (*UpdateResult, error) {
-
+	fmt.Printf("RHEEM_MONGO UpdateOne 1\n")
 	if ctx == nil {
+		fmt.Printf("RHEEM_MONGO UpdateOne 2\n")
 		ctx = context.Background()
 	}
-
+	fmt.Printf("RHEEM_MONGO UpdateOne 3\n")
 	f, err := transformBsoncoreDocument(coll.registry, filter)
 	if err != nil {
-		fmt.Printf("RHEEM_MONGO UpdateOne: %s\n", err.Error())
+		fmt.Printf("RHEEM_MONGO_ERR UpdateOne: %s\n", err.Error())
 		return nil, err
 	}
-
+	fmt.Printf("RHEEM_MONGO UpdateOne 4\n")
 	return coll.updateOrReplace(ctx, f, update, false, rrOne, true, opts...)
 }
 
@@ -622,17 +640,18 @@ func (coll *Collection) UpdateOne(ctx context.Context, filter interface{}, updat
 // For more information about the command, see https://docs.mongodb.com/manual/reference/command/update/.
 func (coll *Collection) UpdateMany(ctx context.Context, filter interface{}, update interface{},
 	opts ...*options.UpdateOptions) (*UpdateResult, error) {
-
+	fmt.Printf("RHEEM_MONGO UpdateMany 1\n")
 	if ctx == nil {
+		fmt.Printf("RHEEM_MONGO UpdateMany 2\n")
 		ctx = context.Background()
 	}
-
+	fmt.Printf("RHEEM_MONGO UpdateMany 3\n")
 	f, err := transformBsoncoreDocument(coll.registry, filter)
 	if err != nil {
-		fmt.Printf("RHEEM_MONGO UpdateMany: %s\n", err.Error())
+		fmt.Printf("RHEEM_MONGO_ERR UpdateMany: %s\n", err.Error())
 		return nil, err
 	}
-
+	fmt.Printf("RHEEM_MONGO UpdateMany 4\n")
 	return coll.updateOrReplace(ctx, f, update, true, rrMany, true, opts...)
 }
 
